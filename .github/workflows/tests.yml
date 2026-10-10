@@ -36,4 +36,13 @@ jobs:
 
     - name: Run automated test suite
       run: |
-        cd backend && python -m pytest -v
+        cd backend
+        python -m pytest -v --tb=short 2>&1 | tee pytest_output.txt || touch test_failed.txt
+        echo "### 🧪 Pytest Test Results" >> $GITHUB_STEP_SUMMARY
+        echo '```text' >> $GITHUB_STEP_SUMMARY
+        cat pytest_output.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        if [ -f test_failed.txt ]; then
+          echo "Tests failed"
+          exit 1
+        fi
