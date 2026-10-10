@@ -1,4 +1,4 @@
-# 🎓 Bulk Certificate Generator — Full Interview & Architecture Master Guide
+# 🎓 Bulk Certificate Generator — Full Architecture Master Guide
 
 This guide is your complete reference manual. It breaks down every single technology, architectural decision, code file, connection method, and interview talking point so you can confidently explain the entire project from end to end.
 
