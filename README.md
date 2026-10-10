@@ -16,7 +16,7 @@ A high-throughput, fault-tolerant enterprise solution for generating personalize
 - [🧪 How to Run Tests](#-how-to-run-tests)
 - [🌸 Task Monitoring with Flower](#-task-monitoring-with-flower)
 - [🔧 Environment Variables Reference](#-environment-variables-reference)
-
+- [🎁 Optional & Extended Improvements](#-optional--extended-improvements)
 ---
 
 ## 🏛️ System Architecture
@@ -514,7 +514,7 @@ Access the dashboard at **`http://localhost:5555`** to observe:
 
 ---
 
-### 💡 Project Evolution & References from Previous Work
+### 🎁 Optional & Extended Improvements
 
 > **Prior Experience & Architectural References**
 >
@@ -523,8 +523,6 @@ Access the dashboard at **`http://localhost:5555`** to observe:
 > While architecting this **Bulk Certificate Generator**, I drew functional inspiration and domain knowledge from that project, particularly around automated certificate generation, recipient management, email delivery, and persistent artifact storage. I evolved these concepts into a scalable, code-first backend architecture using **FastAPI, Celery, Redis, PostgreSQL, and ReportLab**, with asynchronous processing and individual certificate failure isolation.
 
 ---
-
-### 🎁 Optional & Extended Improvements
 
 > **Optional**
 >
