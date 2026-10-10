@@ -1,0 +1,38 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Configuration & Secrets
+.env
+
+# Database & Certificate storage
+*.db
+*.sqlite3
+test_*.db
+certificates/*
+!certificates/.gitkeep
+
+# Test & Coverage artifacts
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+
+# Logs
+*.log
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Build & packaging
+dist/
+build/
+*.egg-info/

@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CertifyHub — Enterprise Bulk Certificate Engine</title>
+  
+  <!-- Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              200: '#c7d2fe',
+              300: '#a5b4fc',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5', // Primary Accent
+              700: '#4338ca',
+              800: '#3730a3',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Alpine.js -->
+  <style>
+    [x-cloak] { display: none !important; }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<body class="h-full font-sans antialiased text-slate-800 bg-slate-50 selection:bg-brand-500 selection:text-white" x-data="certifyApp()" x-init="initApp()">
+
+  <!-- Toast Notification Container -->
+  <div class="fixed top-5 right-5 z-50 flex flex-col space-y-2 max-w-sm w-full pointer-events-none" x-cloak>
+    <template x-for="toast in toasts" :key="toast.id">
+      <div 
+        x-transition:enter="transition ease-out duration-300 transform"
+        x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+        x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+        x-transition:leave="transition ease-in duration-200 transform"
+        x-transition:leave-start="opacity-100 scale-100"
+        x-transition:leave-end="opacity-0 scale-95"
+        :class="{
+          'border-emerald-200 bg-emerald-50 text-emerald-900': toast.type === 'success',
+          'border-rose-200 bg-rose-50 text-rose-900': toast.type === 'error',
+          'border-blue-200 bg-blue-50 text-blue-900': toast.type === 'info',
+          'border-amber-200 bg-amber-50 text-amber-900': toast.type === 'warning'
+        }"
+        class="pointer-events-auto p-4 rounded-xl border shadow-lg flex items-start space-x-3 text-sm">
+        
+        <template x-if="toast.type === 'success'">
+          <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5"></i>
+        </template>
+        <template x-if="toast.type === 'error'">
+          <i data-lucide="alert-circle" class="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5"></i>
+        </template>
+        <template x-if="toast.type === 'info'">
+          <i data-lucide="info" class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5"></i>
+        </template>
+        <template x-if="toast.type === 'warning'">
+          <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5"></i>
+        </template>
+
+        <div class="flex-1">
+          <p class="font-semibold text-xs uppercase tracking-wider opacity-75" x-text="toast.title || toast.type"></p>
+          <p class="text-xs mt-0.5 font-medium" x-text="toast.message"></p>
+        </div>
+
+        <button @click="removeToast(toast.id)" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </template>
+  </div>
+
+  <div class="flex min-h-screen">
+
+    <!-- Mobile Sidebar Backdrop -->
+    <div 
+      x-show="mobileSidebarOpen" 
+      @click="mobileSidebarOpen = false" 
+      x-cloak 
+      x-transition:enter="transition-opacity ease-linear duration-300"
+      x-transition:enter-start="opacity-0"
+      x-transition:enter-end="opacity-100"
+      x-transition:leave="transition-opacity ease-linear duration-300"
+      x-transition:leave-start="opacity-100"
+      x-transition:leave-end="opacity-0"
+      class="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm lg:hidden">
+    </div>
+
+    <!-- Left Sidebar (Flowbite & Preline Style) -->
+    <aside 
+      :class="mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+      class="fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200/80 flex flex-col justify-between transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 flex-shrink-0">
+      
+      <!-- Brand & Navigation -->
+      <div class="p-5 space-y-6">
+        
+        <!-- App Logo & Branding -->
+        <div class="flex items-center justify-between">
+          <a href="#" @click.prevent="setTab('overview')" class="flex items-center space-x-3 group">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-700 to-brand-500 flex items-center justify-center shadow-md shadow-brand-500/20 group-hover:scale-105 transition-transform">
+              <i data-lucide="award" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+              <div class="flex items-center space-x-1.5">
+                <span class="font-bold text-base tracking-tight text-slate-900">CertifyHub</span>
+                <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200">v1.0</span>
+              </div>
+              <p class="text-[11px] text-slate-500 font-medium">Bulk Certificate Engine</p>
+            </div>
+          </a>
+
+          <button @click="mobileSidebarOpen = false" class="lg:hidden text-slate-400 hover:text-slate-600 p-1">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Main Navigation Links -->
+        <nav class="space-y-1">
+          
+          <!-- 1. Overview -->
+          <button 
+            @click="setTab('overview')"
+            :class="activeTab === 'overview' ? 'bg-brand-50 text-brand-700 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'"
+            class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm transition group">
+            <div class="flex items-center space-x-3">
+              <i data-lucide="layout-dashboard" class="w-4 h-4" :class="activeTab === 'overview' ? 'text-brand-600' : 'text-slate-400 group-hover:text-slate-600'"></i>
+              <span>Overview</span>
+            </div>
+          </button>
+
+          <!-- 2. Create Batch -->
+          <button 
+            @click="setTab('create')"
+            :class="activeTab === 'create' ? 'bg-brand-50 text-brand-700 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'"
+            class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm transition group">
+            <div class="flex items-center space-x-3">
+              <i data-lucide="file-plus-2" class="w-4 h-4" :class="activeTab === 'create' ? 'text-brand-600' : 'text-slate-400 group-hover:text-slate-600'"></i>
+              <span>Create Batch</span>
+            </div>
+            <span class="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-brand-100 text-brand-800">New</span>
+          </button>
+
+          <!-- 3. Live Tracker -->
+          <button 
+            @click="setTab('tracker')"
+            :class="activeTab === 'tracker' ? 'bg-brand-50 text-brand-700 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'"
+            class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm transition group">
+            <div class="flex items-center space-x-3">
+              <i data-lucide="activity" class="w-4 h-4" :class="activeTab === 'tracker' ? 'text-brand-600' : 'text-slate-400 group-hover:text-slate-600'"></i>
+              <span>Live Tracker</span>
+            </div>
+            <template x-if="isPolling">
+              <span class="flex h-2 w-2 relative">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-brand-600"></span>
+              </span>
+            </template>
+          </button>
+
+          <!-- 4. Jobs History -->
+          <button 
+            @click="setTab('history')"
+            :class="activeTab === 'history' ? 'bg-brand-50 text-brand-700 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'"
+            class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm transition group">
+            <div class="flex items-center space-x-3">
+              <i data-lucide="history" class="w-4 h-4" :class="activeTab === 'history' ? 'text-brand-600' : 'text-slate-400 group-hover:text-slate-600'"></i>
+              <span>Jobs History</span>
+            </div>
+            <span class="text-xs font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-600" x-text="savedJobs.length"></span>
+          </button>
+
+          <!-- 5. Certificates & Downloads -->
+          <button 
+            @click="setTab('downloads')"
+            :class="activeTab === 'downloads' ? 'bg-brand-50 text-brand-700 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'"
+            class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm transition group">
+            <div class="flex items-center space-x-3">
+              <i data-lucide="download-cloud" class="w-4 h-4" :class="activeTab === 'downloads' ? 'text-brand-600' : 'text-slate-400 group-hover:text-slate-600'"></i>
+              <span>Certificates</span>
+            </div>
+            <span class="text-xs font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium" x-text="completedCertsCount"></span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Bottom Card & System Status -->
+      <div class="p-5 border-t border-slate-100 space-y-4">
+        
+        <!-- Live Backend System Status Badge -->
+        <div class="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Engine Health</span>
+            <div class="flex items-center space-x-1.5">
+              <span class="w-2 h-2 rounded-full" :class="engineHealthy ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
+              <span class="text-[11px] font-medium" :class="engineHealthy ? 'text-emerald-700 font-semibold' : 'text-rose-700'" x-text="engineHealthy ? 'Operational' : 'Offline'"></span>
+            </div>
+          </div>
+          <div class="text-[11px] text-slate-500 flex justify-between">
+            <span>FastAPI + Celery:</span>
+            <span class="font-mono text-slate-700">AsyncPG / Redis</span>
+          </div>
+        </div>
+
+        <!-- External Documentation Link -->
+        <a 
+          href="/docs" 
+          target="_blank" 
+          class="flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-medium text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 transition shadow-sm group">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="book-open" class="w-3.5 h-3.5 text-slate-400 group-hover:text-brand-600"></i>
+            <span>Interactive Swagger API</span>
+          </div>
+          <i data-lucide="external-link" class="w-3 h-3 text-slate-400"></i>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+      
+      <!-- Top Application Header -->
+      <header class="h-16 bg-white border-b border-slate-200/80 flex items-center justify-between px-4 sm:px-6 lg:px-8 flex-shrink-0">
+        
+        <div class="flex items-center space-x-3">
+          <!-- Mobile Drawer Toggle -->
+          <button @click="mobileSidebarOpen = true" class="lg:hidden text-slate-500 hover:text-slate-700 p-1.5 rounded-lg border border-slate-200">
+            <i data-lucide="menu" class="w-5 h-5"></i>
+          </button>
+
+          <!-- Breadcrumb & Title -->
+          <div class="flex items-center space-x-2 text-sm">
+            <span class="text-slate-400 font-medium">Dashboard</span>
+            <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-300"></i>
+            <span class="text-slate-900 font-semibold capitalize" x-text="activeTab === 'downloads' ? 'Certificates & Downloads' : activeTab.replace('_', ' ')"></span>
+          </div>
+        </div>
+
+        <!-- Header Actions -->
+        <div class="flex items-center space-x-3">
+          
+          <!-- Manual Job ID Search Modal Trigger -->
+          <button 
+            @click="openLookupModal = true" 
+            class="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition shadow-sm">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400"></i>
+            <span>Lookup Job UUID</span>
+          </button>
+
+          <!-- Quick Create Batch Button -->
+          <button 
+            x-show="activeTab !== 'create'"
+            @click="setTab('create')" 
+            class="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-sm transition">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>New Batch</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Scrollable Canvas -->
+      <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl w-full mx-auto">
+
+        <!-- ========================================================================= -->
+        <!-- TAB 1: OVERVIEW DASHBOARD -->
+        <!-- ========================================================================= -->
+        <section x-show="activeTab === 'overview'" x-cloak class="space-y-6">
+          
+          <!-- Welcome Hero Banner -->
+          <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+            <div class="absolute -right-10 -bottom-10 w-64 h-64 rounded-full bg-brand-500/10 blur-3xl pointer-events-none"></div>
+            
+            <div class="max-w-2xl space-y-3 relative z-10">
+              <div class="inline-flex items-center space-x-2 px-2.5 py-1 rounded-full bg-brand-500/20 border border-brand-400/30 text-brand-300 text-xs font-medium">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-300"></i>
+                <span>High-Performance Asynchronous PDF Generation</span>
+              </div>
+              <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Bulk Certificate Engine</h2>
+              <p class="text-slate-300 text-sm leading-relaxed">
+                Generate hundreds of stylized, vector-quality PDF completion certificates with fault-tolerant background processing powered by FastAPI, Celery, and PostgreSQL.
+              </p>
+              
+              <div class="flex flex-wrap items-center gap-3 pt-2">
+                <button 
+                  @click="setTab('create')" 
+                  class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold shadow-md shadow-brand-600/30 transition flex items-center space-x-2">
+                  <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                  <span>Create Certificate Batch</span>
+                </button>
+                <button 
+                  @click="loadSampleAndSubmit()" 
+                  class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 border border-white/15 text-xs font-medium backdrop-blur-sm transition flex items-center space-x-2">
+                  <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+                  <span>1-Click Live Test Batch (5 Recipients)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4 Compact SaaS Summary Metric Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <!-- 1. Total Recipients Processed -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+              <div class="space-y-1">
+                <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Recipients</p>
+                <p class="text-2xl font-bold text-slate-900" x-text="totalRecipientsCount"></p>
+                <p class="text-[11px] text-slate-400">Across all tracked batches</p>
+              </div>
+              <div class="w-11 h-11 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-brand-600">
+                <i data-lucide="users" class="w-5 h-5"></i>
+              </div>
+            </div>
+
+            <!-- 2. Completed Certificates -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+              <div class="space-y-1">
+                <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Completed Certs</p>
+                <p class="text-2xl font-bold text-slate-900" x-text="completedCertsCount"></p>
+                <p class="text-[11px] text-emerald-600 font-medium">Ready for download</p>
+              </div>
+              <div class="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
+                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+              </div>
+            </div>
+
+            <!-- 3. Active / Pending Jobs -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+              <div class="space-y-1">
+                <p class="text-xs font-medium text-blue-600 uppercase tracking-wider">Active Processing</p>
+                <p class="text-2xl font-bold text-slate-900" x-text="activeJobsCount"></p>
+                <p class="text-[11px] text-slate-400">In Celery task queue</p>
+              </div>
+              <div class="w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
+                <i data-lucide="cpu" class="w-5 h-5"></i>
+              </div>
+            </div>
+
+            <!-- 4. Failed Certificates -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+              <div class="space-y-1">
+                <p class="text-xs font-medium text-rose-600 uppercase tracking-wider">Failed Records</p>
+                <p class="text-2xl font-bold text-slate-900" x-text="failedCertsCount"></p>
+                <p class="text-[11px] text-slate-400">Isolated error captures</p>
+              </div>
+              <div class="w-11 h-11 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
+                <i data-lucide="alert-octagon" class="w-5 h-5"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Overview Split Grid: Recent Activity + Template Showcase -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Left 2 Cols: Recent Batches Activity -->
+            <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+              <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div>
+                  <h3 class="text-base font-bold text-slate-900">Recent Generation Batches</h3>
+                  <p class="text-xs text-slate-500">Live summary of jobs stored in your application session</p>
+                </div>
+                <button 
+                  @click="setTab('history')" 
+                  class="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center space-x-1">
+                  <span>View All</span>
+                  <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+
+              <!-- Empty state when no jobs -->
+              <div x-show="savedJobs.length === 0" class="py-12 text-center space-y-3">
+                <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+                  <i data-lucide="layers" class="w-6 h-6"></i>
+                </div>
+                <div class="space-y-1">
+                  <p class="text-sm font-semibold text-slate-700">No certificate jobs submitted yet</p>
+                  <p class="text-xs text-slate-400 max-w-sm mx-auto">Submit your first batch of recipients to start generating certificates in the background.</p>
+                </div>
+                <button 
+                  @click="setTab('create')" 
+                  class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-sm transition">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                  <span>Create First Batch</span>
+                </button>
+              </div>
+
+              <!-- List of Recent Jobs -->
+              <div x-show="savedJobs.length > 0" class="divide-y divide-slate-100">
+                <template x-for="job in savedJobs.slice(0, 5)" :key="job.id">
+                  <div class="py-3.5 flex items-center justify-between hover:bg-slate-50/80 px-2 rounded-xl transition">
+                    <div class="flex items-center space-x-3 min-w-0">
+                      <div class="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 flex-shrink-0">
+                        <i data-lucide="file-text" class="w-4 h-4"></i>
+                      </div>
+                      <div class="min-w-0">
+                        <p class="text-xs font-semibold text-slate-900 truncate" x-text="job.event_name"></p>
+                        <p class="text-[11px] text-slate-400 font-mono truncate" x-text="`ID: ${job.id}`"></p>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center space-x-4 flex-shrink-0">
+                      <span 
+                        :class="getStatusBadgeClass(job.status)"
+                        class="text-[10px] font-semibold uppercase px-2.5 py-0.5 rounded-full border"
+                        x-text="job.status.replace('_', ' ')">
+                      </span>
+
+                      <button 
+                        @click="trackJob(job.id); setTab('tracker')" 
+                        class="px-3 py-1.5 rounded-lg border border-slate-200 hover:border-brand-300 hover:bg-brand-50 text-slate-700 hover:text-brand-700 text-xs font-medium transition flex items-center space-x-1">
+                        <span>Track</span>
+                        <i data-lucide="arrow-up-right" class="w-3 h-3"></i>
+                      </button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- Right 1 Col: Standard Certificate Template Showcase -->
+            <div class="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <h3 class="text-sm font-bold text-slate-900">Certificate Template</h3>
+                  <span class="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">A4 Landscape</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-2">All recipients are rendered into this vector ReportLab layout with gold borders, signatures, and unique UUID watermarks.</p>
+              </div>
+
+              <!-- High-Fidelity Certificate Vector Mockup -->
+              <div class="aspect-[1.414/1] bg-slate-50 border-2 border-amber-400/80 rounded-xl p-3 flex flex-col justify-between items-center text-center shadow-inner relative overflow-hidden my-2">
+                <div class="absolute inset-1.5 border border-indigo-900/30 rounded pointer-events-none"></div>
+                
+                <div class="w-full bg-slate-900 py-1 px-2 rounded text-[9px] font-bold text-amber-300 tracking-wider">
+                  CERTIFICATE OF COMPLETION
+                </div>
+
+                <div class="space-y-1 my-auto">
+                  <p class="text-[8px] text-slate-400 italic">This is to certify that</p>
+                  <p class="text-xs font-bold text-indigo-950 underline decoration-amber-400 underline-offset-2">Recipient Full Name</p>
+                  <p class="text-[7px] text-slate-400">has successfully completed</p>
+                  <p class="text-[9px] font-bold text-slate-800">Advanced Cloud Architecture</p>
+                </div>
+
+                <div class="w-full flex justify-between items-end text-[7px] text-slate-400 border-t border-slate-200 pt-1">
+                  <span>Issued by: <strong>Organization</strong></span>
+                  <span class="font-mono">ID: AUTOGEN-UUID</span>
+                </div>
+              </div>
+
+              <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs text-slate-600 flex items-center space-x-2">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600 flex-shrink-0"></i>
+                <span class="text-[11px]">Fault-tolerant isolation guaranteed for every recipient.</span>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ========================================================================= -->
+        <!-- TAB 2: CREATE BATCH SECTION -->
+        <!-- ========================================================================= -->
+        <section x-show="activeTab === 'create'" x-cloak class="space-y-6">
+          
+          <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-6">
+            
+            <!-- Section Header -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <h2 class="text-lg font-bold text-slate-900">Create Certificate Generation Batch</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Submit an organization event and list of recipients to generate personalized PDF certificates asynchronously.</p>
+              </div>
+
+              <!-- Quick Helper Buttons -->
+              <div class="flex items-center space-x-2">
+                <button 
+                  @click="loadSampleData()" 
+                  type="button" 
+                  class="text-xs bg-indigo-50 hover:bg-indigo-100 text-brand-700 border border-indigo-200 px-3 py-1.5 rounded-lg transition font-medium flex items-center space-x-1.5 shadow-sm">
+                  <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-600"></i>
+                  <span>Load Sample (5 Recipients)</span>
+                </button>
+                <button 
+                  @click="clearForm()" 
+                  type="button" 
+                  class="text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg transition font-medium">
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <!-- Form Body -->
+            <form @submit.prevent="submitJob()" class="space-y-6">
+              
+              <!-- Event & Issuer Row -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div class="space-y-1.5">
+                  <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                    Event / Course Name <span class="text-rose-500">*</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    x-model="form.event_name" 
+                    required 
+                    placeholder="e.g. Full Stack Engineering Masterclass 2026" 
+                    class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition shadow-sm" />
+                </div>
+
+                <div class="space-y-1.5">
+                  <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                    Issued By (Organization) <span class="text-rose-500">*</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    x-model="form.issued_by" 
+                    required 
+                    placeholder="e.g. DeepMind Institute & Tech Academy" 
+                    class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition shadow-sm" />
+                </div>
+              </div>
+
+              <!-- Recipient Rows Section -->
+              <div class="space-y-3 pt-2">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h3 class="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                      <span>Recipients List</span>
+                      <span class="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200" x-text="`${form.recipients.length} entered`"></span>
+                    </h3>
+                    <p class="text-xs text-slate-400">Each recipient will receive an independent PDF certificate.</p>
+                  </div>
+
+                  <button 
+                    @click="addRecipient()" 
+                    type="button" 
+                    class="text-xs bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-lg transition font-medium flex items-center space-x-1.5 shadow-sm">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                    <span>Add Recipient</span>
+                  </button>
+                </div>
+
+                <!-- Desktop Recipient Table Header -->
+                <div class="hidden md:grid md:grid-cols-12 gap-3 px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  <div class="col-span-1 text-center">#</div>
+                  <div class="col-span-3">Full Name <span class="text-rose-500">*</span></div>
+                  <div class="col-span-3">Email Address <span class="text-rose-500">*</span></div>
+                  <div class="col-span-3">Course / Module</div>
+                  <div class="col-span-2">Date (YYYY-MM-DD)</div>
+                </div>
+
+                <!-- Dynamic Recipient Rows -->
+                <div class="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                  <template x-for="(r, idx) in form.recipients" :key="idx">
+                    <div class="p-3 bg-white border border-slate-200/90 rounded-xl hover:border-slate-300 transition shadow-sm flex flex-col md:grid md:grid-cols-12 gap-2.5 items-center">
+                      
+                      <!-- Index -->
+                      <div class="w-full md:w-auto md:col-span-1 flex items-center justify-between text-xs font-mono text-slate-400 font-medium md:justify-center">
+                        <span class="md:hidden text-slate-500 font-bold uppercase text-[10px]">Recipient #<span x-text="idx + 1"></span></span>
+                        <span class="hidden md:inline" x-text="idx + 1"></span>
+                        
+                        <button 
+                          @click="removeRecipient(idx)" 
+                          type="button" 
+                          x-show="form.recipients.length > 1"
+                          class="md:hidden text-slate-400 hover:text-rose-600 p-1">
+                          <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                      </div>
+
+                      <!-- Name -->
+                      <div class="w-full md:col-span-3">
+                        <input 
+                          type="text" 
+                          x-model="r.name" 
+                          required 
+                          placeholder="Jane Doe" 
+                          class="w-full bg-slate-50/50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition" />
+                      </div>
+
+                      <!-- Email -->
+                      <div class="w-full md:col-span-3">
+                        <input 
+                          type="email" 
+                          x-model="r.email" 
+                          required 
+                          placeholder="jane@example.com" 
+                          class="w-full bg-slate-50/50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition" />
+                      </div>
+
+                      <!-- Course -->
+                      <div class="w-full md:col-span-3">
+                        <input 
+                          type="text" 
+                          x-model="r.course_name" 
+                          placeholder="Specialization (optional)" 
+                          class="w-full bg-slate-50/50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition" />
+                      </div>
+
+                      <!-- Date & Delete Action -->
+                      <div class="w-full md:col-span-2 flex items-center space-x-2">
+                        <input 
+                          type="date" 
+                          x-model="r.completion_date" 
+                          class="w-full bg-slate-50/50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition" />
+                        
+                        <button 
+                          @click="removeRecipient(idx)" 
+                          type="button" 
+                          x-show="form.recipients.length > 1"
+                          title="Remove recipient"
+                          class="hidden md:flex text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition">
+                          <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Duplicate Email Warning -->
+              <template x-if="hasDuplicateEmails()">
+                <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-center space-x-2">
+                  <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 flex-shrink-0"></i>
+                  <span>Warning: Duplicate email addresses detected in recipient list. Each recipient must have a unique email address.</span>
+                </div>
+              </template>
+
+              <!-- Server Error Banner -->
+              <div x-show="errorMessage" x-cloak class="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-start space-x-2.5">
+                <i data-lucide="alert-circle" class="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5"></i>
+                <div class="space-y-1">
+                  <p class="font-semibold">Submission Validation Failed</p>
+                  <p class="text-rose-700" x-text="errorMessage"></p>
+                </div>
+              </div>
+
+              <!-- Submit Footer -->
+              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-5 border-t border-slate-100">
+                <div class="text-xs text-slate-500">
+                  <span>Backend will dispatch a background Celery task with HTTP 202 Accepted.</span>
+                </div>
+
+                <div class="flex items-center space-x-3">
+                  <button 
+                    @click="addRecipient()" 
+                    type="button" 
+                    class="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition">
+                    + Add Row
+                  </button>
+
+                  <button 
+                    type="submit" 
+                    :disabled="isSubmitting"
+                    class="px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-xs font-semibold shadow-md shadow-brand-600/20 transition flex items-center space-x-2">
+                    <i data-lucide="send" class="w-4 h-4" x-show="!isSubmitting"></i>
+                    <i data-lucide="loader-2" class="w-4 h-4 animate-spin" x-show="isSubmitting"></i>
+                    <span x-text="isSubmitting ? 'Submitting Batch...' : 'Generate Certificates'"></span>
+                  </button>
+                </div>
+              </div>
+
+            </form>
+          </div>
+
+        </section>
+
+        <!-- ========================================================================= -->
+        <!-- TAB 3: LIVE JOB TRACKER -->
+        <!-- ========================================================================= -->
+        <section x-show="activeTab === 'tracker'" x-cloak class="space-y-6">
+          
+          <!-- Empty State when no active job is selected -->
+          <div x-show="!currentJob" class="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-sm space-y-4">
+            <div class="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-brand-600 flex items-center justify-center mx-auto">
+              <i data-lucide="radar" class="w-7 h-7"></i>
+            </div>
+            
+            <div class="space-y-1">
+              <h3 class="text-base font-bold text-slate-900">No active job selected</h3>
+              <p class="text-xs text-slate-500 max-w-sm mx-auto">Submit a new generation batch from the Create tab or paste an existing Job UUID below to monitor live progress.</p>
+            </div>
+
+            <div class="max-w-md mx-auto flex gap-2 pt-2">
+              <input 
+                type="text" 
+                x-model="manualJobId" 
+                placeholder="Paste Job UUID (e.g. 021504d5-ce0f-...)" 
+                class="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              <button 
+                @click="trackJob(manualJobId)" 
+                class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold transition shadow-sm">
+                Track Job
+              </button>
+            </div>
+          </div>
+
+          <!-- Active Job Monitor Card -->
+          <div x-show="currentJob" class="space-y-6">
+            
+            <!-- Job Status & Header Card -->
+            <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 shadow-sm space-y-6">
+              
+              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-5">
+                <div class="space-y-1">
+                  <div class="flex items-center space-x-3">
+                    <h2 class="text-xl font-bold text-slate-900" x-text="currentJob?.event_name"></h2>
+                    <span 
+                      :class="getStatusBadgeClass(currentJob?.status)"
+                      class="text-xs font-semibold uppercase px-2.5 py-0.5 rounded-full border flex items-center space-x-1.5">
+                      <template x-if="currentJob?.status === 'processing'">
+                        <span class="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping"></span>
+                      </template>
+                      <span x-text="currentJob?.status?.replace('_', ' ')"></span>
+                    </span>
+                  </div>
+                  
+                  <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 pt-0.5">
+                    <span>Issued by: <strong class="text-slate-700" x-text="currentJob?.issued_by"></strong></span>
+                    <span class="font-mono text-slate-400">UUID: <span class="text-slate-600" x-text="currentJob?.id"></span></span>
+                  </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="flex items-center space-x-2">
+                  <button 
+                    @click="fetchJobStatus()" 
+                    :disabled="isPollingRequest"
+                    class="px-3.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium transition flex items-center space-x-1.5 shadow-sm">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5" :class="isPollingRequest ? 'animate-spin text-brand-600' : ''"></i>
+                    <span>Refresh</span>
+                  </button>
+                  
+                  <button 
+                    @click="copyJobId()" 
+                    class="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition"
+                    title="Copy Job ID">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Live Progress Bar & Quantitative Metrics -->
+              <div class="space-y-4">
+                <div class="flex justify-between items-center text-xs">
+                  <span class="font-semibold text-slate-700 uppercase tracking-wider text-[11px]">Asynchronous Generation Progress</span>
+                  <span class="font-mono font-bold text-sm text-brand-600" x-text="`${currentJob?.progress_percentage || 0}%`"></span>
+                </div>
+
+                <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden border border-slate-200/80">
+                  <div 
+                    class="bg-gradient-to-r from-brand-600 to-emerald-500 h-3 rounded-full transition-all duration-500"
+                    :style="`width: ${currentJob?.progress_percentage || 0}%`">
+                  </div>
+                </div>
+
+                <!-- Real-Time Metric Counters -->
+                <div class="grid grid-cols-3 gap-4 pt-1">
+                  <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-center">
+                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total Batch</p>
+                    <p class="text-xl font-bold text-slate-900 mt-0.5" x-text="currentJob?.total_count || 0"></p>
+                  </div>
+                  
+                  <div class="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200 text-center">
+                    <p class="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Completed</p>
+                    <p class="text-xl font-bold text-emerald-800 mt-0.5" x-text="currentJob?.completed_count || 0"></p>
+                  </div>
+
+                  <div class="bg-rose-50/60 p-4 rounded-xl border border-rose-200 text-center">
+                    <p class="text-[10px] font-semibold uppercase tracking-wider text-rose-700">Failed</p>
+                    <p class="text-xl font-bold text-rose-800 mt-0.5" x-text="currentJob?.failed_count || 0"></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recipient Certificates Table Card -->
+            <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 shadow-sm space-y-4">
+              
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-base font-bold text-slate-900">Recipient Certificates</h3>
+                  <p class="text-xs text-slate-500">Individual certificate generation and delivery status</p>
+                </div>
+                <span class="text-xs font-mono font-medium px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700" x-text="`${currentJob?.certificates?.length || 0} Records`"></span>
+              </div>
+
+              <!-- Recipient Table -->
+              <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                <table class="w-full text-left text-xs text-slate-700 divide-y divide-slate-200">
+                  <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-semibold">
+                    <tr>
+                      <th class="py-3 px-4">Recipient Name</th>
+                      <th class="py-3 px-4">Email</th>
+                      <th class="py-3 px-4">Course / Module</th>
+                      <th class="py-3 px-4">Status</th>
+                      <th class="py-3 px-4 text-right">Download</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100 bg-white">
+                    <template x-for="cert in currentJob?.certificates" :key="cert.id">
+                      <tr class="hover:bg-slate-50/80 transition">
+                        <td class="py-3 px-4 font-semibold text-slate-900" x-text="cert.recipient_name"></td>
+                        <td class="py-3 px-4 font-mono text-slate-500" x-text="cert.recipient_email"></td>
+                        <td class="py-3 px-4 text-slate-600" x-text="cert.course_name || 'Standard'"></td>
+                        
+                        <!-- Status Badge -->
+                        <td class="py-3 px-4">
+                          <span 
+                            :class="getStatusBadgeClass(cert.status)"
+                            class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase border"
+                            x-text="cert.status">
+                          </span>
+
+                          <!-- Inline Error Message Diagnostic -->
+                          <div x-show="cert.error_message" class="mt-1 p-1.5 bg-rose-50 border border-rose-200 rounded text-[10px] text-rose-700 font-mono" x-text="cert.error_message"></div>
+                        </td>
+
+                        <!-- Download Action -->
+                        <td class="py-3 px-4 text-right">
+                          <template x-if="cert.status === 'completed'">
+                            <a 
+                              :href="`/api/v1/jobs/${currentJob.id}/certificates/${cert.id}/download`" 
+                              target="_blank"
+                              class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs shadow-sm transition">
+                              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                              <span>PDF</span>
+                            </a>
+                          </template>
+                          <template x-if="cert.status !== 'completed'">
+                            <span class="text-slate-400 italic text-[11px]">Processing...</span>
+                          </template>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+
+        </section>
+
+        <!-- ========================================================================= -->
+        <!-- TAB 4: JOBS HISTORY -->
+        <!-- ========================================================================= -->
+        <section x-show="activeTab === 'history'" x-cloak class="space-y-6">
+          
+          <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 shadow-sm space-y-6">
+            
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <h2 class="text-lg font-bold text-slate-900">Certificate Generation History</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Historical batch records tracked during your active application sessions.</p>
+              </div>
+
+              <!-- Clear History button -->
+              <div class="flex items-center space-x-2">
+                <button 
+                  x-show="savedJobs.length > 0"
+                  @click="clearHistory()" 
+                  class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-slate-600 text-xs font-medium transition">
+                  Clear Session History
+                </button>
+              </div>
+            </div>
+
+            <!-- Empty History State -->
+            <div x-show="savedJobs.length === 0" class="py-16 text-center space-y-3">
+              <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+                <i data-lucide="history" class="w-6 h-6"></i>
+              </div>
+              <p class="text-sm font-semibold text-slate-700">No jobs recorded in history</p>
+              <p class="text-xs text-slate-400 max-w-sm mx-auto">Create a batch from the Create tab or paste a Job UUID to track it.</p>
+            </div>
+
+            <!-- History Table -->
+            <div x-show="savedJobs.length > 0" class="overflow-x-auto border border-slate-200 rounded-xl">
+              <table class="w-full text-left text-xs text-slate-700 divide-y divide-slate-200">
+                <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-semibold">
+                  <tr>
+                    <th class="py-3 px-4">Event / Program</th>
+                    <th class="py-3 px-4">Issuer</th>
+                    <th class="py-3 px-4">Job UUID</th>
+                    <th class="py-3 px-4">Recipients</th>
+                    <th class="py-3 px-4">Status</th>
+                    <th class="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white">
+                  <template x-for="job in savedJobs" :key="job.id">
+                    <tr class="hover:bg-slate-50/80 transition">
+                      <td class="py-3.5 px-4 font-semibold text-slate-900" x-text="job.event_name"></td>
+                      <td class="py-3.5 px-4 text-slate-600" x-text="job.issued_by"></td>
+                      <td class="py-3.5 px-4 font-mono text-slate-400 text-[11px]" x-text="job.id"></td>
+                      <td class="py-3.5 px-4 font-medium" x-text="`${job.total_count} recipients`"></td>
+                      
+                      <td class="py-3.5 px-4">
+                        <span 
+                          :class="getStatusBadgeClass(job.status)"
+                          class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase border"
+                          x-text="job.status.replace('_', ' ')">
+                        </span>
+                      </td>
+
+                      <td class="py-3.5 px-4 text-right space-x-1.5">
+                        <button 
+                          @click="trackJob(job.id); setTab('tracker')" 
+                          class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 text-xs font-medium transition">
+                          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                          <span>Track</span>
+                        </button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+        </section>
+
+        <!-- ========================================================================= -->
+        <!-- TAB 5: CERTIFICATES & DOWNLOADS -->
+        <!-- ========================================================================= -->
+        <section x-show="activeTab === 'downloads'" x-cloak class="space-y-6">
+          
+          <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 shadow-sm space-y-6">
+            
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <h2 class="text-lg font-bold text-slate-900">Generated Certificates Repository</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Aggregated list of all completion certificates ready for download.</p>
+              </div>
+
+              <!-- Search input -->
+              <div class="w-full sm:w-64">
+                <input 
+                  type="text" 
+                  x-model="certSearchQuery" 
+                  placeholder="Filter by name or email..." 
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-1.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+            </div>
+
+            <!-- Empty Downloads state -->
+            <div x-show="filteredCertificates.length === 0" class="py-16 text-center space-y-3">
+              <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+                <i data-lucide="download-cloud" class="w-6 h-6"></i>
+              </div>
+              <p class="text-sm font-semibold text-slate-700">No completed certificates available</p>
+              <p class="text-xs text-slate-400 max-w-sm mx-auto">Generate a batch from the Create tab to download generated PDF certificates.</p>
+            </div>
+
+            <!-- Downloads Table -->
+            <div x-show="filteredCertificates.length > 0" class="overflow-x-auto border border-slate-200 rounded-xl">
+              <table class="w-full text-left text-xs text-slate-700 divide-y divide-slate-200">
+                <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-semibold">
+                  <tr>
+                    <th class="py-3 px-4">Recipient</th>
+                    <th class="py-3 px-4">Email</th>
+                    <th class="py-3 px-4">Event</th>
+                    <th class="py-3 px-4">Status</th>
+                    <th class="py-3 px-4 text-right">Download PDF</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white">
+                  <template x-for="c in filteredCertificates" :key="c.id">
+                    <tr class="hover:bg-slate-50/80 transition">
+                      <td class="py-3.5 px-4 font-semibold text-slate-900" x-text="c.recipient_name"></td>
+                      <td class="py-3.5 px-4 font-mono text-slate-500" x-text="c.recipient_email"></td>
+                      <td class="py-3.5 px-4 text-slate-700" x-text="c.event_name"></td>
+                      
+                      <td class="py-3.5 px-4">
+                        <span 
+                          :class="getStatusBadgeClass(c.status)"
+                          class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase border"
+                          x-text="c.status">
+                        </span>
+                      </td>
+
+                      <td class="py-3.5 px-4 text-right">
+                        <template x-if="c.status === 'completed'">
+                          <a 
+                            :href="`/api/v1/jobs/${c.job_id}/certificates/${c.id}/download`" 
+                            target="_blank"
+                            class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs shadow-sm transition">
+                            <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
+                            <span>Download PDF</span>
+                          </a>
+                        </template>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Job UUID Lookup Dialog Modal -->
+  <div 
+    x-show="openLookupModal" 
+    x-cloak 
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+    x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="transition ease-in duration-150"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0">
+    
+    <div 
+      @click.outside="openLookupModal = false" 
+      class="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xl max-w-md w-full space-y-4">
+      
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center space-x-2">
+          <i data-lucide="search" class="w-4 h-4 text-brand-600"></i>
+          <span>Lookup Generation Job</span>
+        </h3>
+        <button @click="openLookupModal = false" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-500">Enter a Job UUID returned during submission to inspect its current status, progress percentage, and certificates.</p>
+
+      <form @submit.prevent="lookupJobFromModal()" class="space-y-4">
+        <input 
+          type="text" 
+          x-model="modalLookupId" 
+          required 
+          placeholder="e.g. e9093bfb-b109-40c8-836b-43f0c538d4d8" 
+          class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500" />
+
+        <div class="flex justify-end space-x-2">
+          <button 
+            type="button" 
+            @click="openLookupModal = false" 
+            class="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50">
+            Cancel
+          </button>
+          <button 
+            type="submit" 
+            class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-sm">
+            Inspect Job
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Application Logic (Alpine.js) -->
+  <script>
+    function certifyApp() {
+      return {
+        activeTab: 'overview',
+        mobileSidebarOpen: false,
+        openLookupModal: false,
+        modalLookupId: '',
+        manualJobId: '',
+        errorMessage: '',
+        isSubmitting: false,
+        isPolling: false,
+        isPollingRequest: false,
+        engineHealthy: true,
+        pollTimer: null,
+        currentJob: null,
+        savedJobs: [],
+        toasts: [],
+        certSearchQuery: '',
+
+        form: {
+          event_name: '',
+          issued_by: '',
+          recipients: [
+            { name: '', email: '', course_name: '', completion_date: '' }
+          ]
+        },
+
+        initApp() {
+          // Load jobs from localStorage
+          try {
+            const stored = localStorage.getItem('certifyhub_jobs');
+            if (stored) {
+              this.savedJobs = JSON.parse(stored);
+            }
+          } catch (e) {
+            console.error('Failed to load stored jobs', e);
+          }
+
+          // Initial health check
+          this.checkHealth();
+
+          // Initialize icons
+          this.$nextTick(() => lucide.createIcons());
+        },
+
+        async checkHealth() {
+          try {
+            const res = await fetch('/health');
+            this.engineHealthy = res.ok;
+          } catch (e) {
+            this.engineHealthy = false;
+          }
+        },
+
+        setTab(tab) {
+          this.activeTab = tab;
+          this.mobileSidebarOpen = false;
+          this.$nextTick(() => lucide.createIcons());
+        },
+
+        addRecipient() {
+          this.form.recipients.push({ name: '', email: '', course_name: '', completion_date: '' });
+          this.$nextTick(() => lucide.createIcons());
+        },
+
+        removeRecipient(idx) {
+          this.form.recipients.splice(idx, 1);
+        },
+
+        clearForm() {
+          this.form = {
+            event_name: '',
+            issued_by: '',
+            recipients: [{ name: '', email: '', course_name: '', completion_date: '' }]
+          };
+          this.errorMessage = '';
+          this.$nextTick(() => lucide.createIcons());
+        },
+
+        hasDuplicateEmails() {
+          const emails = this.form.recipients.map(r => r.email.trim().toLowerCase()).filter(e => e.length > 0);
+          return new Set(emails).size !== emails.length;
+        },
+
+        loadSampleData() {
+          const today = new Date().toISOString().split('T')[0];
+          this.form.event_name = "Cloud & Distributed Systems Masterclass 2026";
+          this.form.issued_by = "DeepMind Institute of Technology";
+          this.form.recipients = [
+            { name: "Siddharth Sharma", email: "siddharth.sharma@example.com", course_name: "Advanced Distributed Systems", completion_date: today },
+            { name: "Ananya Iyer", email: "ananya.iyer@example.com", course_name: "Backend Architecture", completion_date: today },
+            { name: "Rahul Verma", email: "rahul.verma@example.com", course_name: "FastAPI & Microservices", completion_date: today },
+            { name: "Priya Patel", email: "priya.patel@example.com", course_name: "Cloud Computing", completion_date: today },
+            { name: "David Miller", email: "david.miller@example.com", course_name: "Python Performance", completion_date: today }
+          ];
+          this.addToast('info', 'Loaded 5 sample recipients into form.');
+          this.$nextTick(() => lucide.createIcons());
+        },
+
+        async loadSampleAndSubmit() {
+          this.setTab('create');
+          this.loadSampleData();
+          await this.$nextTick();
+          await this.submitJob();
+        },
+
+        async submitJob() {
+          this.errorMessage = '';
+
+          // Client-side duplicate check
+          if (this.hasDuplicateEmails()) {
+            this.errorMessage = 'Duplicate email addresses detected. Each recipient must have a unique email.';
+            this.addToast('error', this.errorMessage);
+            return;
+          }
+
+          this.isSubmitting = true;
+
+          try {
+            const payload = {
+              event_name: this.form.event_name.trim(),
+              issued_by: this.form.issued_by.trim(),
+              recipients: this.form.recipients.map(r => ({
+                name: r.name.trim(),
+                email: r.email.trim(),
+                course_name: r.course_name ? r.course_name.trim() : null,
+                completion_date: r.completion_date || null
+              }))
+            };
+
+            const res = await fetch('/api/v1/jobs/', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+              const errData = await res.json();
+              throw new Error(errData.detail || JSON.stringify(errData));
+            }
+
+            const data = await res.json();
+
+            // Save to savedJobs list
+            this.saveJobReference({
+              id: data.id,
+              event_name: data.event_name,
+              issued_by: data.issued_by,
+              status: data.status || 'pending',
+              total_count: data.total_count,
+              created_at: new Date().toISOString()
+            });
+
+            this.addToast('success', `Batch submitted! Job ID: ${data.id.substring(0, 8)}...`);
+            
+            // Switch to tracker and begin tracking
+            this.trackJob(data.id);
+            this.setTab('tracker');
+
+          } catch (err) {
+            this.errorMessage = err.message || 'Failed to submit batch job.';
+            this.addToast('error', this.errorMessage);
+          } finally {
+            this.isSubmitting = false;
+            this.$nextTick(() => lucide.createIcons());
+          }
+        },
+
+        saveJobReference(job) {
+          const existingIdx = this.savedJobs.findIndex(j => j.id === job.id);
+          if (existingIdx >= 0) {
+            this.savedJobs[existingIdx] = { ...this.savedJobs[existingIdx], ...job };
+          } else {
+            this.savedJobs.unshift(job);
+          }
+          try {
+            localStorage.setItem('certifyhub_jobs', JSON.stringify(this.savedJobs));
+          } catch (e) {}
+        },
+
+        async trackJob(jobId) {
+          if (!jobId) return;
+          if (this.pollTimer) {
+            clearInterval(this.pollTimer);
+            this.pollTimer = null;
+          }
+
+          this.manualJobId = jobId;
+          this.isPolling = true;
+          await this.fetchJobStatus();
+
+          // Poll every 1.5 seconds if job is active
+          this.pollTimer = setInterval(async () => {
+            if (!this.currentJob) return;
+            const status = this.currentJob.status;
+            if (status === 'completed' || status === 'failed' || status === 'partially_completed') {
+              clearInterval(this.pollTimer);
+              this.pollTimer = null;
+              this.isPolling = false;
+              this.addToast('info', `Job ${status.replace('_', ' ')} (${this.currentJob.completed_count}/${this.currentJob.total_count} certs).`);
+              return;
+            }
+            await this.fetchJobStatus();
+          }, 1500);
+        },
+
+        async fetchJobStatus() {
+          if (!this.manualJobId) return;
+          this.isPollingRequest = true;
+
+          try {
+            const res = await fetch(`/api/v1/jobs/${this.manualJobId}/detail`);
+            if (res.ok) {
+              const data = await res.json();
+              this.currentJob = data;
+              
+              // Update local saved reference
+              this.saveJobReference({
+                id: data.id,
+                event_name: data.event_name,
+                issued_by: data.issued_by,
+                status: data.status,
+                total_count: data.total_count,
+                completed_count: data.completed_count,
+                failed_count: data.failed_count,
+                progress_percentage: data.progress_percentage
+              });
+            } else if (res.status === 404) {
+              this.addToast('error', `Job UUID ${this.manualJobId} not found.`);
+              if (this.pollTimer) clearInterval(this.pollTimer);
+              this.isPolling = false;
+            }
+          } catch (e) {
+            console.error('Fetch status error', e);
+          } finally {
+            this.isPollingRequest = false;
+            this.$nextTick(() => lucide.createIcons());
+          }
+        },
+
+        lookupJobFromModal() {
+          if (!this.modalLookupId) return;
+          const id = this.modalLookupId.trim();
+          this.openLookupModal = false;
+          this.modalLookupId = '';
+          this.trackJob(id);
+          this.setTab('tracker');
+        },
+
+        copyJobId() {
+          if (!this.currentJob?.id) return;
+          navigator.clipboard.writeText(this.currentJob.id);
+          this.addToast('success', 'Job UUID copied to clipboard.');
+        },
+
+        clearHistory() {
+          if (confirm('Clear all session job history?')) {
+            this.savedJobs = [];
+            localStorage.removeItem('certifyhub_jobs');
+            this.addToast('info', 'Session history cleared.');
+          }
+        },
+
+        getStatusBadgeClass(status) {
+          switch (status) {
+            case 'pending':
+              return 'bg-amber-50 text-amber-700 border-amber-200';
+            case 'processing':
+            case 'generating':
+              return 'bg-blue-50 text-blue-700 border-blue-200';
+            case 'completed':
+              return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+            case 'partially_completed':
+              return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+            case 'failed':
+              return 'bg-rose-50 text-rose-700 border-rose-200';
+            default:
+              return 'bg-slate-100 text-slate-700 border-slate-200';
+          }
+        },
+
+        addToast(type, message, title = '') {
+          const id = Date.now() + Math.random();
+          this.toasts.push({ id, type, message, title });
+          this.$nextTick(() => lucide.createIcons());
+          setTimeout(() => {
+            this.removeToast(id);
+          }, 4500);
+        },
+
+        removeToast(id) {
+          this.toasts = this.toasts.filter(t => t.id !== id);
+        },
+
+        // Computed metrics for Overview
+        get totalRecipientsCount() {
+          return this.savedJobs.reduce((sum, j) => sum + (j.total_count || 0), 0);
+        },
+        get completedCertsCount() {
+          return this.savedJobs.reduce((sum, j) => sum + (j.completed_count || 0), 0);
+        },
+        get failedCertsCount() {
+          return this.savedJobs.reduce((sum, j) => sum + (j.failed_count || 0), 0);
+        },
+        get activeJobsCount() {
+          return this.savedJobs.filter(j => j.status === 'processing' || j.status === 'pending').length;
+        },
+
+        // Computed certificates for Downloads tab
+        get filteredCertificates() {
+          const certs = [];
+          if (this.currentJob?.certificates) {
+            this.currentJob.certificates.forEach(c => {
+              certs.push({
+                ...c,
+                event_name: this.currentJob.event_name,
+                job_id: this.currentJob.id
+              });
+            });
+          }
+
+          if (!this.certSearchQuery) return certs;
+          const q = this.certSearchQuery.toLowerCase();
+          return certs.filter(c => 
+            c.recipient_name?.toLowerCase().includes(q) || 
+            c.recipient_email?.toLowerCase().includes(q) ||
+            c.event_name?.toLowerCase().includes(q)
+          );
+        }
+      };
+    }
+  </script>
+</body>
+</html>
