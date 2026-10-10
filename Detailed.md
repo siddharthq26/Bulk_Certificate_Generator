@@ -12,7 +12,6 @@ This guide is your complete reference manual. It breaks down every single techno
 5. [Deep Dive: Code Structure & Explanation of Every File](#5-deep-dive-code-structure--file-by-file)
 6. [Key Engineering & Design Decisions (Interview Gold)](#6-key-engineering--design-decisions)
 7. [Testing Strategy (How 41 Tests Were Structured)](#7-testing-strategy)
-8. [Common Interview Questions & Exact Answers](#8-common-interview-questions--exact-answers)
 
 ---
 
@@ -228,21 +227,7 @@ We wrote 41 automated tests using `pytest` and in-memory SQLite:
 
 ---
 
-## 8. Common Interview Questions & Exact Answers
 
-### Q1: *"How does the system handle 10,000 recipients in a single request?"*
-> **Answer**: *"The API accepts the request, validates the schema in memory, bulk-inserts the rows into PostgreSQL within a single transaction, and immediately returns a 202 Accepted response. The Celery worker processes the queue in chunks or concurrent threads without keeping any HTTP connection open. The client polls the status endpoint to monitor progress."*
-
-### Q2: *"What happens if the Celery worker crashes in the middle of a job?"*
-> **Answer**: *"Because we configure Celery with `task_acks_late=True` and `task_reject_on_worker_lost=True`, unacknowledged tasks are automatically returned to the Redis queue and picked up by another worker. Additionally, each certificate's status (`PENDING`, `GENERATING`, `COMPLETED`, `FAILED`) is committed to PostgreSQL as it completes, ensuring idempotency if a task is retried."*
-
-### Q3: *"Why did you use ReportLab instead of converting HTML to PDF?"*
-> **Answer**: *"HTML-to-PDF tools like Puppeteer or wkhtmltopdf require launching a headless Chromium browser or bulky C++ binaries, consuming significant RAM and CPU. ReportLab is a pure-Python, high-performance vector graphics library that generates standard PDFs with minimal memory overhead and zero external browser dependencies."*
-
-### Q4: *"How do you prevent duplicate certificates from being created?"*
-> **Answer**: *"First, the Pydantic validator checks the batch for duplicate emails and rejects the request with HTTP 422 before database insertion. Second, each certificate receives a unique UUID in PostgreSQL and a deterministic sanitized filename on disk."*
-
----
 
 ### 🚀 Summary of Commands to Remember
 - **Start Project**: `./run.sh`
