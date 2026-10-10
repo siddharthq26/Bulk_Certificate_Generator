@@ -36,4 +36,4 @@ jobs:
 
     - name: Run automated test suite
       run: |
-        python -m pytest backend/tests -v
+        cd backend && python -m pytest -v
