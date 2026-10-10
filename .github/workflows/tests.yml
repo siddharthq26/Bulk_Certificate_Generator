@@ -9,6 +9,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: backend
+      DATABASE_URL: sqlite+aiosqlite:///./test.db
+      SYNC_DATABASE_URL: sqlite:///./test.db
+      CELERY_BROKER_URL: memory://
+      CELERY_RESULT_BACKEND: cache+memory://
+      REDIS_URL: redis://localhost:6379/0
+      CERT_STORAGE_PATH: ./certificates
 
     steps:
     - name: Checkout repository
@@ -28,4 +36,4 @@ jobs:
 
     - name: Run automated test suite
       run: |
-        pytest
+        pytest -v
