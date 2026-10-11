@@ -21,7 +21,7 @@ A high-throughput, fault-tolerant enterprise solution for generating personalize
 
 ## 🏛️ System Architecture
 
-### Visualized Architecture Diagram
+### Architecture Diagram
 
 ```mermaid
 flowchart TB
