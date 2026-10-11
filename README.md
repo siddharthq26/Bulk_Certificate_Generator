@@ -24,52 +24,69 @@ A high-throughput, fault-tolerant enterprise solution for generating personalize
 ### Visualized Architecture Diagram
 
 ```mermaid
-graph TD
-    subgraph ClientLayer ["1. Client & Presentation Layer"]
-        UI["Web Dashboard (Tailwind CSS + Alpine.js)"]
-        CLI["REST Clients / cURL / Postman / Third-party Apps"]
+flowchart TB
+    %% ================= CLIENT LAYER =================
+    subgraph ClientLayer["1. Client / User Interface"]
+        UI["🖥️ Web Dashboard<br/><i>(Tailwind CSS + Alpine.js)</i>"]
+        APIClient["📱 External Clients<br/><i>(cURL / Postman / Third-party)</i>"]
     end
 
-    subgraph APILayer ["2. API & Ingestion Layer (FastAPI)"]
-        API["FastAPI Web Server (Port 8000)"]
-        Validator["Pydantic Validation (JobCreate & RecipientSchema)"]
-        Router["Jobs Router (/api/v1/jobs)"]
+    %% ================= API LAYER =================
+    subgraph APILayer["2. API & Ingestion Layer (FastAPI)"]
+        Router["⚡ API Router & Endpoints<br/><code>/api/v1/jobs</code>"]
+        Validator["🛡️ Data Validator<br/><i>(Pydantic Models)</i>"]
+        AsyncDB["🔌 Async DB Engine<br/><i>(AsyncPG for high concurrency)</i>"]
     end
 
-    subgraph StorageQueue ["3. Data & Message Infrastructure"]
-        DB[("PostgreSQL Database (AsyncPG & Psycopg2)")]
-        Redis[("Redis Message Broker & Celery Result Backend")]
+    %% ================= QUEUE LAYER =================
+    subgraph QueueLayer["3. Message Broker & Queue"]
+        Redis[("📮 Redis Broker<br/><i>(Holds task queue in memory)</i>")]
     end
 
-    subgraph WorkerLayer ["4. Background Worker Layer (Celery)"]
-        Worker["Celery Background Worker (Solo / Prefork Pool)"]
-        PDFGen["ReportLab Vector PDF Generation Engine"]
-        EmailSvc["Email Delivery Service (Optional SMTP)"]
+    %% ================= WORKER LAYER =================
+    subgraph WorkerLayer["4. Background Processing (Celery)"]
+        Worker["⚙️ Celery Worker<br/><i>(Pulls and executes tasks)</i>"]
+        PDFEngine["📄 PDF Engine<br/><i>(ReportLab - Vector PDF rendering)</i>"]
+        EmailSvc["✉️ Email Service<br/><i>(Optional SMTP dispatch)</i>"]
+        SyncDB["🔌 Sync DB Engine<br/><i>(Psycopg2 for worker threads)</i>"]
     end
 
-    subgraph StorageLayer ["5. Artifact Storage & Monitoring"]
-        Storage["Local PDF Storage (/certificates/*.pdf)"]
-        Flower["Flower Worker Monitor (Port 5555)"]
+    %% ================= STORAGE & MONITORING =================
+    subgraph StorageLayer["5. Database & Storage Layer"]
+        Postgres[("🗄️ PostgreSQL Database<br/><i>(Jobs & Certificates records)</i>")]
+        DiskStorage["📁 File Storage<br/><code>./certificates/*.pdf</code>"]
     end
 
-    UI -->|"HTTP Request / 1.5s Polling"| API
-    CLI -->|"POST /api/v1/jobs/"| API
-    API --> Validator
-    Validator --> Router
-    Router -->|"1. Insert Job & Recipients (Status: PENDING)"| DB
-    Router -->|"2. Dispatch Task (job_id)"| Redis
-    Router -.->|"3. Return 202 Accepted (job_id)"| UI
+    subgraph MonitoringLayer["6. Monitoring & Observability"]
+        Flower["🌸 Flower Dashboard<br/><i>(Celery worker & queue monitor)</i>"]
+    end
 
-    Redis -->|"Consume Batch Task"| Worker
-    Worker -->|"Update Job Status -> PROCESSING"| DB
-    Worker -->|"Render Certificate Canvas"| PDFGen
-    PDFGen -->|"Write .pdf to Disk"| Storage
-    Worker -->|"Update Record -> COMPLETED / FAILED"| DB
-    Worker -.->|"Send Notification Email (Optional)"| EmailSvc
-    Worker -->|"Update Job -> COMPLETED / PARTIAL / FAILED"| DB
-    Worker -->|"Stream Task Metrics"| Flower
-    UI -->|"GET /api/v1/jobs/{id}/certificates/{cid}/download"| API
-    API -->|"Stream FileResponse (application/pdf)"| Storage
+    %% ================= FLOW CONNECTIONS =================
+    %% Step 1: Submission
+    UI -->|"1. Submit bulk job"| Router
+    APIClient -->|"1. Submit JSON payload"| Router
+    Router -->|"Validate schema"| Validator
+    Validator -->|"2. Save job (Status: PENDING)"| AsyncDB
+    AsyncDB --> Postgres
+    Router -->|"3. Enqueue job (job_id)"| Redis
+    Router -.->|"4. Fast response: 202 Accepted"| UI
+
+    %% Step 2: Background Processing
+    Redis -->|"5. Fetch queued job"| Worker
+    Worker -->|"6. Update status -> PROCESSING"| SyncDB
+    SyncDB --> Postgres
+    Worker -->|"7. Render vector certificates"| PDFEngine
+    PDFEngine -->|"8. Save PDF files"| DiskStorage
+    Worker -->|"9. Update status -> COMPLETED / FAILED"| SyncDB
+    Worker -.->|"Send optional emails"| EmailSvc
+    Worker -.->|"Stream task heartbeat"| Flower
+
+    %% Step 3: Polling & Download
+    UI -->|"10. Poll progress (Status & count)"| Router
+    Router -->|"Read current job state"| AsyncDB
+    UI -->|"11. Download certificate PDF"| Router
+    Router -->|"Stream file from disk"| DiskStorage
+
 ```
 
 ### End-to-End Data Flow
