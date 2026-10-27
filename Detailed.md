@@ -228,7 +228,6 @@ We wrote 41 automated tests using `pytest` and in-memory SQLite:
 ---
 
 
-
 ### 🚀 Summary of Commands to Remember
 - **Start Project**: `./run.sh`
 - **Run Tests**: `pytest`
